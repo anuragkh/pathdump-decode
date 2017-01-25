@@ -15,9 +15,9 @@ FILE *f_out;
 unsigned long long counter;
 size_t pkt_size;
 u_char* out_pkt;
-int32_t dst_ip;
+uint32_t dst_ip;
 
-int32_t ip_string_to_int32(const char* ip) {
+uint32_t ip_string_to_uint32(const char* ip) {
   unsigned char tmp[4];
   sscanf(ip, "%hhu.%hhu.%hhu.%hhu", &tmp[3], &tmp[2], &tmp[1], &tmp[0]);
   return tmp[0] | tmp[1] << 8 | tmp[2] << 16 | tmp[3] << 24;
@@ -84,7 +84,7 @@ void packet_handler(u_char* user_data, const struct pcap_pkthdr* pkthdr, const u
   }
 
   if (ip->ip_dst.s_addr != dst_ip) {
-    fprintf(stderr, "!!! Not an incoming packet !!!\n");
+    fprintf(stderr, "!!! Not an incoming packet; dst_ip=% !!!\n");
     return;
   }
 
@@ -150,7 +150,7 @@ int main(int argc, char** argv) {
   char* in = argv[1];
   char* out = argv[2];
   char* dstip = argv[3];
-  dst_ip = ip_string_to_int32(dstip);
+  dst_ip = ip_string_to_uint32(dstip);
 
   f_out = fopen(out, "w");
 
