@@ -83,7 +83,7 @@ void packet_handler(u_char* user_data, const struct pcap_pkthdr* pkthdr, const u
     return;
   }
 
-  if (ip->ip_dst.s_addr != dst_ip) {
+  if (ntohl(ip->ip_dst.s_addr) != dst_ip) {
     //fprintf(stderr, "!!! Not an incoming packet !!!\n");
     return;
   }
