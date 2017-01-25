@@ -10,6 +10,8 @@
 
 #include "decode.h"
 
+#define MAX_PATH_LEN 6
+
 decode *D;
 FILE *f_out;
 unsigned long long counter;
@@ -39,11 +41,15 @@ void packet_handler(u_char* user_data, const struct pcap_pkthdr* pkthdr, const u
   int8_t sbytes[4], dbytes[4];
   int16_t vlan_tags[2];
   int8_t vlan_len = 0;
-  int32_t path_vec[6] = { -1, -1, -1, -1, -1, -1};
+  int32_t path_vec[MAX_PATH_LEN] = { -1, -1, -1, -1, -1, -1};
 
-  int ip_start = 14;  // IP header starts at offset 14 into the packet
+  // IP header starts at offset 14 into the packet if there are no vlan headers
+  int ip_start = 14;  
 
+  // Parse eth header
   eth = (struct ether_header*) packet;
+
+  // Parse VLAN headers if any
   if (ntohs(eth->ether_type) == ETHERTYPE_VLAN) {
     has_path = true;
     vlan1 = (struct vlan_header*) (packet + sizeof(struct ether_header));
@@ -64,18 +70,18 @@ void packet_handler(u_char* user_data, const struct pcap_pkthdr* pkthdr, const u
     fprintf(stderr, "!!! Unknown ether_type, no VLAN tags !!!\n");
     return;
   }
-  eth->ether_type = ETHERTYPE_IP;
 
+  // Parse IP header
   ip = (struct ip*) (packet + ip_start);
-  ip->ip_len = sizeof(struct ip) + sizeof(struct tcphdr) + 6 * sizeof(int32_t);
-
   if (ip->ip_p != IPPROTO_TCP) {
     fprintf(stderr, "!!! Not a tcp packet !!!\n");
     return;
   }
 
+  // Parse TCP header
   tcp = (struct tcphdr*) (packet + ip_start + 20);
 
+  // If the packet header has VLAN tags, decode the path info
   if (has_path) {
     saddr = ip->ip_src.s_addr;
     saddr = ntohl(saddr);
@@ -87,19 +93,29 @@ void packet_handler(u_char* user_data, const struct pcap_pkthdr* pkthdr, const u
     list<int32_t> path;
     D->decode_path(vlan_tags, vlan_len, sbytes, dbytes, &path);
 
-    typedef list<int32_t>::iterator list_it;
     size_t pos = 0;
+    typedef list<int32_t>::iterator list_it;
     for (list_it it = path.begin(); it != path.end(); it++)
       path_vec[pos++] = *it;
   }
 
   // Create new packet
+  // Copy eth header
+  eth->ether_type = ETHERTYPE_IP;
   memcpy(out_pkt, eth, sizeof(struct ether_header));
+
+  // Copy ip header
+  ip->ip_len = sizeof(struct ip) + sizeof(struct tcphdr) +
+               MAX_PATH_LEN * sizeof(int32_t);
   memcpy(out_pkt + sizeof(struct ether_header), ip, sizeof(struct ip));
+
+  // Copy tcp header
   memcpy(out_pkt + sizeof(struct ether_header) + sizeof(struct ip), tcp,
          sizeof(struct tcphdr));
+
+  // Copy path vector
   memcpy(out_pkt + sizeof(struct ether_header) + sizeof(struct ip)
-         + sizeof(struct tcphdr), path_vec, 6 * sizeof(int32_t));
+         + sizeof(struct tcphdr), path_vec, MAX_PATH_LEN * sizeof(int32_t));
 
   fwrite(out_pkt, pkt_size, 1, f_out);
 
