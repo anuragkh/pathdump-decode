@@ -93,8 +93,15 @@ void packet_handler(u_char* user_data, const struct pcap_pkthdr* pkthdr, const u
 
     size_t pos = 0;
     typedef list<int32_t>::iterator list_it;
-    for (list_it it = path.begin(); it != path.end(); it++)
+    for (list_it it = path.begin(); it != path.end(); it++) {
       path_vec[pos++] = *it;
+#ifdef PRINT_PATH
+      fprintf(stderr, "%d ", *it);
+#endif // PRINT_PATH
+    }
+#ifdef PRINT_PATH
+      fprintf(stderr, "\n");
+#endif // PRINT_PATH
   }
 
   // Create new packet
