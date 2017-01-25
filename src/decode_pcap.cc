@@ -15,6 +15,13 @@ FILE *f_out;
 unsigned long long counter;
 size_t pkt_size;
 u_char* out_pkt;
+int32_t dst_ip;
+
+int32_t ip_string_to_int32(const char* ip) {
+  unsigned char tmp[4];
+  sscanf(ip, "%hhu.%hhu.%hhu.%hhu", &tmp[3], &tmp[2], &tmp[1], &tmp[0]);
+  return tmp[0] | tmp[1] << 8 | tmp[2] << 16 | tmp[3] << 24;
+}
 
 struct vlan_header {
   uint16_t vlan_tci;
@@ -76,6 +83,11 @@ void packet_handler(u_char* user_data, const struct pcap_pkthdr* pkthdr, const u
     return;
   }
 
+  if (ip->ip_dst.s_addr != dst_ip) {
+    fprintf(stderr, "!!! Not an incoming packet !!!\n");
+    return;
+  }
+
   // Parse TCP header
   tcp = (struct tcphdr*) (packet + ip_start + 20);
 
@@ -130,13 +142,15 @@ void packet_handler(u_char* user_data, const struct pcap_pkthdr* pkthdr, const u
 }
 
 int main(int argc, char** argv) {
-  if (argc != 3) {
-    fprintf(stderr, "Usage: %s [input-pcap] [output-pcap]\n", argv[0]);
+  if (argc != 4) {
+    fprintf(stderr, "Usage: %s [input-pcap] [output-pcap] [dst-ip]\n", argv[0]);
     return 1;
   }
 
   char* in = argv[1];
   char* out = argv[2];
+  char* dstip = argv[3];
+  dst_ip = ip_string_to_int32(dstip);
 
   f_out = fopen(out, "w");
 
