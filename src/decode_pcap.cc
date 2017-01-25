@@ -1,5 +1,3 @@
-#include <cstdint>
-
 #include <pcap.h>
 
 #include <net/ethernet.h>
