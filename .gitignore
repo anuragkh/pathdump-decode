@@ -1,0 +1,92 @@
+# Compiled Object files
+*.slo
+*.lo
+*.o
+*.obj
+
+# Precompiled Headers
+*.gch
+*.pch
+
+# Compiled Dynamic libraries
+*.so
+*.dylib
+*.dll
+
+# Fortran module files
+*.mod
+
+# Compiled Static libraries
+*.lai
+*.la
+*.a
+*.lib
+lib/*
+
+# Executables
+*.exe
+*.out
+*.app
+bin/*
+
+# Directories
+build
+scratch
+reference
+results
+netplay-results
+ls-results
+thrift/gen
+
+# Third party dirs
+3rdparty/dpdk-16.07/
+3rdparty/ovs/
+3rdparty/thrift/
+
+# Vagrant files
+.vagrant
+
+# Eclipse files
+.settings
+
+# Netbeans files
+nbproject
+
+# Idea files
+.idea
+
+# Misc. excludes
+queries.txt
+
+# generic ignores
+*.deps
+*.dirstamp
+*.libs
+*.log
+*.trs
+*.suo
+*.pyc
+*.cache
+*.user
+*.ipch
+*.sdf
+*.jar
+*.exe
+*.dll
+*_ReSharper*
+*.opensdf
+*.swp
+*.hi
+*~
+*tmp*
+.*project
+junit*.properties
+gen-*
+aclocal.m4
+acinclude.m4
+autom4te.cache
+node_modules
+test-driver
+.sonar
+.DS_Store
+/Debug/
