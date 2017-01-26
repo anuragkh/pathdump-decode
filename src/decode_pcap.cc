@@ -20,8 +20,10 @@ u_char* out_pkt;
 uint32_t dst_ip;
 uint32_t seq;
 
-std::map<uint32_t, uint32_t> ip2seq;
 typedef std::map<uint32_t, uint32_t>::iterator ip2seq_it;
+std::map<uint32_t, uint32_t> ip2seq_min;
+std::map<uint32_t, uint32_t> ip2seq_max;
+
 
 std::multimap<uint64_t, u_char*> pkt_map;
 typedef std::pair<uint64_t, u_char*> pkt_entry;
@@ -99,10 +101,15 @@ void collect_stats(u_char* user_data, const struct pcap_pkthdr* pkthdr, const u_
   tcp = (struct tcphdr*) (packet + ip_start + 20);
 
   uint32_t ip_addr = ntohl(ip->ip_src.s_addr);
-  if (ip2seq.find(ip_addr) == ip2seq.end())
-    ip2seq[ip_addr] = tcp->th_seq;  
+  if (ip2seq_min.find(ip_addr) == ip2seq_min.end())
+    ip2seq_min[ip_addr] = tcp->th_seq;  
   else
-    ip2seq[ip_addr] = std::min(ip2seq[ip_addr], tcp->th_seq);
+    ip2seq_min[ip_addr] = std::min(ip2seq_min[ip_addr], tcp->th_seq);
+
+  if (ip2seq_max.find(ip_addr) == ip2seq_max.end())
+    ip2seq_max[ip_addr] = tcp->th_seq;
+  else
+    ip2seq_max[ip_addr] = std::max(ip2seq_max[ip_addr], tcp->th_seq);
 }
 
 void packet_handler(u_char* user_data, const struct pcap_pkthdr* pkthdr, const u_char* packet) {
@@ -311,8 +318,13 @@ int main(int argc, char** argv) {
     fprintf(stderr, "pcap_loop() failure: %s\n", pcap_geterr(pcap));
   }
 
-  fprintf(stderr, "stats:\n");
-  for (ip2seq_it it = ip2seq.begin(); it != ip2seq.end(); it++) {
+  fprintf(stderr, "min:\n");
+  for (ip2seq_it it = ip2seq_min.begin(); it != ip2seq_min.end(); it++) {
+    fprintf(stderr, "%u:%u\n", it->first, it->second);
+  }
+
+  fprintf(stderr, "max:\n");
+  for (ip2seq_it it = ip2seq_max.begin(); it != ip2seq_max.end(); it++) {
     fprintf(stderr, "%u:%u\n", it->first, it->second);
   }
 
