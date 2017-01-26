@@ -49,7 +49,9 @@ void packet_handler(u_char* user_data, const struct pcap_pkthdr* pkthdr, const u
   int32_t path_vec[MAX_PATH_LEN] = { -1, -1, -1, -1, -1, -1};
 
   // IP header starts at offset 14 into the packet if there are no vlan headers
-  int ip_start = 14;  
+  int ip_start = 14;
+
+  uint64_t packet_timestamp = (uint64_t) pkthdr->ts.tv_sec * 1000000 + pkthdr->ts.tv_usec;
 
   // Parse eth header
   eth = (struct ether_header*) packet;
@@ -112,7 +114,7 @@ void packet_handler(u_char* user_data, const struct pcap_pkthdr* pkthdr, const u
 #endif // PRINT_PATH
     }
 #ifdef PRINT_PATH
-      fprintf(stderr, "\n");
+    fprintf(stderr, "\n");
 #endif // PRINT_PATH
   }
 
@@ -133,6 +135,10 @@ void packet_handler(u_char* user_data, const struct pcap_pkthdr* pkthdr, const u
   // Copy path vector
   memcpy(out_pkt + sizeof(struct ether_header) + sizeof(struct ip)
          + sizeof(struct tcphdr), path_vec, MAX_PATH_LEN * sizeof(int32_t));
+
+  memcpy(out_pkt + sizeof(struct ether_header) + sizeof(struct ip)
+         + sizeof(struct tcphdr) + MAX_PATH_LEN * sizeof(int32_t),
+         &packet_timestamp, sizeof(uint64_t));
 
   fwrite(out_pkt, pkt_size, 1, f_out);
 
@@ -159,9 +165,9 @@ int main(int argc, char** argv) {
 
   counter = 0;
   pkt_size = sizeof(struct ether_header) + sizeof(struct ip)
-             + sizeof(struct tcphdr) + 6 * sizeof(int32_t);
+             + sizeof(struct tcphdr) + 6 * sizeof(int32_t) + sizeof(uint64_t);
 
-  assert(pkt_size == 78);
+  assert(pkt_size == 86);
   out_pkt = new u_char[pkt_size];
 
   char errbuff[PCAP_ERRBUF_SIZE];
