@@ -98,7 +98,7 @@ void collect_stats(u_char* user_data, const struct pcap_pkthdr* pkthdr, const u_
   // Parse TCP header
   tcp = (struct tcphdr*) (packet + ip_start + 20);
 
-  uint32_t ip_addr = ntohl(ip->ip_dst.s_addr);
+  uint32_t ip_addr = ntohl(ip->ip_src.s_addr);
   if (ip2seq.find(ip_addr) == ip2seq.end())
     ip2seq[ip_addr] = tcp->th_seq;  
   else
