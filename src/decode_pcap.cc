@@ -20,6 +20,9 @@ u_char* out_pkt;
 uint32_t dst_ip;
 uint32_t seq;
 
+std::map<uint32_t, uint32_t> ip2seq;
+typedef std::map<uint32_t, uint32_t>::iterator ip2seq_it;
+
 std::multimap<uint64_t, u_char*> pkt_map;
 typedef std::pair<uint64_t, u_char*> pkt_entry;
 typedef std::multimap<uint64_t, u_char*>::iterator map_it;
@@ -49,6 +52,57 @@ void itoip(int32_t *ip, int8_t *bytes) {
   bytes[2] = ((*ip) >> 8) & 0xFF;
   bytes[1] = ((*ip) >> 16) & 0xFF;
   bytes[0] = ((*ip) >> 24) & 0xFF;
+}
+
+void collect_stats(u_char* user_data, const struct pcap_pkthdr* pkthdr, const u_char* packet) {
+  struct ether_header *eth;
+  struct vlan_header *vlan1, *vlan2;
+  struct ip *ip;
+  struct tcphdr *tcp;
+
+  // IP header starts at offset 14 into the packet if there are no vlan headers
+  int ip_start = 14;
+
+  // Parse eth header
+  eth = (struct ether_header*) packet;
+
+  // Parse VLAN headers if any
+  if (ntohs(eth->ether_type) == ETHERTYPE_VLAN) {
+    vlan1 = (struct vlan_header*) (packet + sizeof(struct ether_header));
+    ip_start += sizeof(struct vlan_header);
+
+    if (ntohs(vlan1->eth_proto) == ETHERTYPE_VLAN) {
+      vlan2 = vlan1 + 1;
+      ip_start += sizeof(struct vlan_header);
+    }
+
+    if (ntohs(vlan1->eth_proto) != ETHERTYPE_IP) {
+      fprintf(stderr, "!!! Not an IP packet !!!\n");
+      return;
+    }
+  } else if (ntohs(eth->ether_type) != ETHERTYPE_IP) {
+    fprintf(stderr, "!!! Unknown ether_type, no VLAN tags !!!\n");
+    return;
+  }
+
+  // Parse IP header
+  ip = (struct ip*) (packet + ip_start);
+  if (ip->ip_p != IPPROTO_TCP) {
+    fprintf(stderr, "!!! Not a tcp packet !!!\n");
+    return;
+  }
+
+  if (ntohl(ip->ip_dst.s_addr) != dst_ip)
+    return;
+
+  // Parse TCP header
+  tcp = (struct tcphdr*) (packet + ip_start + 20);
+
+  uint32_t ip_addr = ntohl(ip->ip_dst.s_addr);
+  if (ip2seq.find(ip_addr) == ip2seq.end())
+    ip2seq[ip_addr] = tcp->th_seq;  
+  else
+    ip2seq[ip_addr] = std::min(ip2seq[ip_addr], tcp->th_seq);
 }
 
 void packet_handler(u_char* user_data, const struct pcap_pkthdr* pkthdr, const u_char* packet) {
@@ -253,8 +307,24 @@ int main(int argc, char** argv) {
   }
 
   // start packet processing loop
+  if (pcap_loop(pcap, 0, collect_stats, NULL) < 0) {
+    fprintf(stderr, "pcap_loop() failure: %s\n", pcap_geterr(pcap));
+  }
+
+  pcap = pcap_open_offline(in, errbuff);
+  if (pcap == NULL) {
+    fprintf(stderr, "pcap_open_offline() failure: %s\n", errbuff);
+    return 1;
+  }
+
+  // start packet processing loop
   if (pcap_loop(pcap, 0, packet_handler, NULL) < 0) {
     fprintf(stderr, "pcap_loop() failure: %s\n", pcap_geterr(pcap));
+  }
+
+  fprintf(stderr, "stats:\n");
+  for (ip2seq_it it = ip2seq.begin(); it != ip2seq.end(); it++) {
+    fprintf(stderr, "%u:%u\n", it->first, it->second);
   }
 
   fprintf(stderr, "[END] Processed %lld packets\n", counter);
