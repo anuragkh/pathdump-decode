@@ -101,8 +101,10 @@ void collect_stats(u_char* user_data, const struct pcap_pkthdr* pkthdr, const u_
   tcp = (struct tcphdr*) (packet + ip_start + 20);
 
   uint32_t ip_addr = ntohl(ip->ip_src.s_addr);
-  if (ip2seq_min.find(ip_addr) == ip2seq_min.end())
+  if (ip2seq_min.find(ip_addr) == ip2seq_min.end()) {
+    fprintf(stderr, "%u:%u (first)\n", ip_addr, tcp->th_seq);
     ip2seq_min[ip_addr] = tcp->th_seq;  
+  }
   else
     ip2seq_min[ip_addr] = std::min(ip2seq_min[ip_addr], tcp->th_seq);
 
