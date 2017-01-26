@@ -25,6 +25,14 @@ typedef std::pair<uint64_t, u_char*> pkt_entry;
 typedef std::multimap<uint64_t, u_char*>::iterator map_it;
 typedef std::pair<map_it, map_it> map_entry;
 
+void print_bytes(unsigned char* bytes) {
+  fprintf(stderr, "Bytes: ");
+  for (size_t i = 0; i < pkt_size; i++) {
+    fprintf(stderr, "%u ", bytes[i]);
+  }
+  fprintf(stderr, "\n");
+}
+
 uint32_t ip_string_to_uint32(const char* ip) {
   unsigned char tmp[4];
   sscanf(ip, "%hhu.%hhu.%hhu.%hhu", &tmp[3], &tmp[2], &tmp[1], &tmp[0]);
@@ -261,7 +269,8 @@ int main(int argc, char** argv) {
     // Now print out that whole range
     for (map_it d = range.first; d != range.second; ++d) {
       fwrite(d->second, pkt_size, 1, f_out);
-      std::cout << d->first << "\n";
+      std::cout << d->first << ": ";
+      print_bytes(d->second);
       delete[] d->second;
     }
   }
