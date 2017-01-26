@@ -6,6 +6,8 @@
 #include <netinet/tcp.h>
 #include <arpa/inet.h>
 
+#include <map>
+
 #include "decode.h"
 
 #define MAX_PATH_LEN 6
@@ -16,6 +18,12 @@ unsigned long long counter;
 size_t pkt_size;
 u_char* out_pkt;
 uint32_t dst_ip;
+uint32_t seq;
+
+std::multimap<uint64_t, u_char*> pkt_map;
+typedef std::pair<uint64_t, u_char*> pkt_entry;
+typedef std::multimap<uint64_t, u_char*>::iterator map_it;
+typedef std::pair<map_it, map_it> map_entry;
 
 uint32_t ip_string_to_uint32(const char* ip) {
   unsigned char tmp[4];
@@ -47,6 +55,7 @@ void packet_handler(u_char* user_data, const struct pcap_pkthdr* pkthdr, const u
   int16_t vlan_tags[2];
   int8_t vlan_len = 0;
   int32_t path_vec[MAX_PATH_LEN] = { -1, -1, -1, -1, -1, -1};
+  uint32_t priority = 1;
 
   // IP header starts at offset 14 into the packet if there are no vlan headers
   int ip_start = 14;
@@ -138,11 +147,65 @@ void packet_handler(u_char* user_data, const struct pcap_pkthdr* pkthdr, const u
   memcpy(out_pkt + sizeof(struct ether_header) + sizeof(struct ip)
          + sizeof(struct tcphdr), path_vec, MAX_PATH_LEN * sizeof(int32_t));
 
+  // Copy packet timestamp
   memcpy(out_pkt + sizeof(struct ether_header) + sizeof(struct ip)
          + sizeof(struct tcphdr) + MAX_PATH_LEN * sizeof(int32_t),
          &packet_timestamp, sizeof(uint64_t));
 
-  fwrite(out_pkt, pkt_size, 1, f_out);
+  // Copy priority
+  priority = 1;
+  memcpy(out_pkt + sizeof(struct ether_header) + sizeof(struct ip)
+         + sizeof(struct tcphdr) + MAX_PATH_LEN * sizeof(int32_t)
+         + sizeof(uint64_t), &priority, sizeof(uint32_t));
+
+  // fwrite(out_pkt, pkt_size, 1, f_out);
+  {
+    u_char* pkt = new u_char[pkt_size];
+    memcpy(pkt, out_pkt, pkt_size);
+    pkt_map.insert(pkt_entry(packet_timestamp, pkt));
+  }
+
+  // Create 9 new packets with higher priority, and in order seq
+  for (uint32_t i = 0; i < 9; i++) {
+    // Update source IP
+    ip->ip_src.s_addr = htonl(0);
+    memcpy(out_pkt + sizeof(struct ether_header), ip, sizeof(struct ip));
+
+    // Update tcp header
+    tcp->th_seq = seq;
+    memcpy(out_pkt + sizeof(struct ether_header) + sizeof(struct ip), tcp,
+           sizeof(struct tcphdr));
+
+    // Update path vector
+    path_vec[0] = 1;
+    for (size_t j = 1; j < MAX_PATH_LEN; j++)
+      path_vec[j] = -1;
+    memcpy(out_pkt + sizeof(struct ether_header) + sizeof(struct ip)
+           + sizeof(struct tcphdr), path_vec, MAX_PATH_LEN * sizeof(int32_t));
+
+    // Update packet timestamp
+    packet_timestamp++;
+    memcpy(out_pkt + sizeof(struct ether_header) + sizeof(struct ip)
+           + sizeof(struct tcphdr) + MAX_PATH_LEN * sizeof(int32_t),
+           &packet_timestamp, sizeof(uint64_t));
+
+    // Update priority
+    priority = 0;
+    memcpy(out_pkt + sizeof(struct ether_header) + sizeof(struct ip)
+           + sizeof(struct tcphdr) + MAX_PATH_LEN * sizeof(int32_t)
+           + sizeof(uint64_t), &priority, sizeof(uint32_t));
+
+    // fwrite(out_pkt, pkt_size, 1, f_out);
+
+    {
+      u_char* pkt = new u_char[pkt_size];
+      memcpy(pkt, out_pkt, pkt_size);
+      pkt_map.insert(pkt_entry(packet_timestamp, pkt));
+    }
+
+    seq++;
+  }
+
 
   if (++counter % 100000 == 0) {
     fprintf(stderr, "Processed %lld packets\n", counter);
@@ -167,10 +230,13 @@ int main(int argc, char** argv) {
 
   counter = 0;
   pkt_size = sizeof(struct ether_header) + sizeof(struct ip)
-             + sizeof(struct tcphdr) + 6 * sizeof(int32_t) + sizeof(uint64_t);
+             + sizeof(struct tcphdr) + 6 * sizeof(int32_t) + sizeof(uint64_t)
+             + sizeof(uint32_t);
 
-  assert(pkt_size == 86);
+  assert(pkt_size == 90);
   out_pkt = new u_char[pkt_size];
+
+  seq = 0;
 
   char errbuff[PCAP_ERRBUF_SIZE];
 
@@ -183,15 +249,24 @@ int main(int argc, char** argv) {
   // start packet processing loop
   if (pcap_loop(pcap, 0, packet_handler, NULL) < 0) {
     fprintf(stderr, "pcap_loop() failure: %s\n", pcap_geterr(pcap));
-    fprintf(stderr, "[END] Processed %lld packets\n", counter);
-    fclose(f_out);
-    delete out_pkt;
-    return 1;
   }
 
   fprintf(stderr, "[END] Processed %lld packets\n", counter);
   fclose(f_out);
   delete out_pkt;
+
+  map_entry range;
+  for (map_it i = pkt_map.begin(); i != pkt_map.end(); i = range.second) {
+    // Get the range of the current key
+    range = pkt_map.equal_range(i->first);
+
+    // Now print out that whole range
+    for (map_it d = range.first; d != range.second; ++d) {
+      fwrite(d->second, pkt_size, 1, f_out);
+      std::cout << d->first << "\n";
+      delete[] d->second;
+    }
+  }
 
   return 0;
 }
