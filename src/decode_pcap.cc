@@ -258,7 +258,6 @@ int main(int argc, char** argv) {
   }
 
   fprintf(stderr, "[END] Processed %lld packets\n", counter);
-  fclose(f_out);
   delete out_pkt;
 
   map_entry range;
@@ -272,6 +271,8 @@ int main(int argc, char** argv) {
       delete[] d->second;
     }
   }
+  
+  fclose(f_out);
 
   return 0;
 }
