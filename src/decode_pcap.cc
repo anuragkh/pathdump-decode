@@ -269,7 +269,7 @@ int main(int argc, char** argv) {
     // Now print out that whole range
     for (map_it d = range.first; d != range.second; ++d) {
       fwrite(d->second, pkt_size, 1, f_out);
-      std::cout << d->first << ": ";
+      fprintf(stderr, "%lu: ", d->first);
       print_bytes(d->second);
       delete[] d->second;
     }
