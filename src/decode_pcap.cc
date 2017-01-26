@@ -266,11 +266,9 @@ int main(int argc, char** argv) {
     // Get the range of the current key
     range = pkt_map.equal_range(i->first);
 
-    // Now print out that whole range
+    // Now write out that whole range
     for (map_it d = range.first; d != range.second; ++d) {
       fwrite(d->second, pkt_size, 1, f_out);
-      fprintf(stderr, "%lu: ", d->first);
-      print_bytes(d->second);
       delete[] d->second;
     }
   }
