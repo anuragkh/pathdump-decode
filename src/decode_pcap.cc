@@ -311,6 +311,11 @@ int main(int argc, char** argv) {
     fprintf(stderr, "pcap_loop() failure: %s\n", pcap_geterr(pcap));
   }
 
+  fprintf(stderr, "stats:\n");
+  for (ip2seq_it it = ip2seq.begin(); it != ip2seq.end(); it++) {
+    fprintf(stderr, "%u:%u\n", it->first, it->second);
+  }
+
   pcap = pcap_open_offline(in, errbuff);
   if (pcap == NULL) {
     fprintf(stderr, "pcap_open_offline() failure: %s\n", errbuff);
@@ -320,11 +325,6 @@ int main(int argc, char** argv) {
   // start packet processing loop
   if (pcap_loop(pcap, 0, packet_handler, NULL) < 0) {
     fprintf(stderr, "pcap_loop() failure: %s\n", pcap_geterr(pcap));
-  }
-
-  fprintf(stderr, "stats:\n");
-  for (ip2seq_it it = ip2seq.begin(); it != ip2seq.end(); it++) {
-    fprintf(stderr, "%u:%u\n", it->first, it->second);
   }
 
   fprintf(stderr, "[END] Processed %lld packets\n", counter);
