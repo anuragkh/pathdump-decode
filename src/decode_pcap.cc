@@ -53,6 +53,8 @@ void packet_handler(u_char* user_data, const struct pcap_pkthdr* pkthdr, const u
 
   uint64_t packet_timestamp = (uint64_t) pkthdr->ts.tv_sec * 1000000 + pkthdr->ts.tv_usec;
 
+  fprintf(stderr, "%llu\n", packet_timestamp);
+
   // Parse eth header
   eth = (struct ether_header*) packet;
 
